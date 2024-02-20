@@ -1,14 +1,17 @@
-import datetime
-
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 import os
 import requests
+import datetime
 from post import Post
+import smtplib
 
 AUTHOR = "Cristina"
-npoint_endpoint = os.environ.get("NPOINT_ENDPOINT")
-npoint_data = requests.get(url=npoint_endpoint).json()
 
+my_email = os.environ.get("MY_EMAIL")
+email_password = os.environ.get("EMAIL_PASS")
+
+npoint_endpoint = os.environ.get("NPOINT_ENDPOINT")  # Use your own npoint link
+npoint_data = requests.get(url=npoint_endpoint).json()
 
 posts = [
     Post(id=post_data["id"],
@@ -37,9 +40,17 @@ def about():
     return render_template("about.html", year=current_year)
 
 
-@app.route("/contact")
+@app.route("/contact", methods=["GET", "POST"])
 def contact():
-    return render_template("contact.html", year=current_year)
+    if request.method == "POST":
+        data = request.form
+
+        # Send email to yourself with received form data
+        send_email(data)
+
+        return render_template("contact.html", year=current_year, form_submitted=True)
+    else:
+        return render_template("contact.html", year=current_year, form_submitted=False)
 
 
 @app.route("/post/<index>")
@@ -50,5 +61,21 @@ def post(index):
     return render_template("post.html", post=target_post, year=current_year)
 
 
+def send_email(form_data):
+    name = form_data["name"]
+    email = form_data["email"]
+    phone = form_data["phone"]
+    message = form_data["message"]
+    with smtplib.SMTP("smtp.gmail.com", port=587, timeout=120) as connection:
+        connection.starttls()
+        connection.login(user=my_email, password=email_password)
+
+        msg_body = f"Name: {name}\nEmail: {email}\nPhone: {phone}\nMessage: {message}"
+
+        connection.sendmail(from_addr=email,
+                            to_addrs=my_email,
+                            msg=f"Subject: New Message\n\n{msg_body}")
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
